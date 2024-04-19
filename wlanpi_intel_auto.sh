@@ -21,8 +21,8 @@ echo "This is for the Country code of $LINE"
 
 echo "lsusb"
 lsusb
-echo "lspci -v"
-lspci -v
+echo "sudo lspci -v"
+sudo lspci -v
 echo "dmesg | grep ucode"
 dmesg | grep ucode
 echo "sudo iw wlan0 scan"
@@ -42,7 +42,7 @@ end=`date +%s`
 echo Execution time was `expr $end - $start` seconds.
 
 
-} | tee -a ./wlanpi-be200-$LINE.txt
+} | tee ./wlanpi-be200-$LINE.txt
 
 time sleep 5
 
