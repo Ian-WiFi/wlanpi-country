@@ -1,4 +1,6 @@
 #!/bin/bash
+$intel_model="BE200"
+
 sudo ip link set wlan0 down
 sudo ip link set wlan0 up
 
@@ -37,7 +39,7 @@ echo "iw phy0 info"
 iw phy0 info
 echo "iw phy0 channels"
 iw phy0 channels
-} | tee ./wlanpi-be200-$1.txt
+} | tee ./$intel_model/wlanpi-$intel_model-$1.txt
 
 
 sudo service hostapd stop
