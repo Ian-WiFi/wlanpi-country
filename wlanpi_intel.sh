@@ -21,8 +21,8 @@ echo "This is for the Country code of $1"
 
 echo "lsusb"
 lsusb
-echo "lspci -v"
-lspci -v
+echo "sudo lspci -v"
+sudo lspci -v
 echo "dmesg | grep ucode"
 dmesg | grep ucode
 echo "sudo iw wlan0 scan"
