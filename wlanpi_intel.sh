@@ -37,7 +37,7 @@ echo "iw phy0 info"
 iw phy0 info
 echo "iw phy0 channels"
 iw phy0 channels
-} | tee -a ./wlanpi-be200-$1.txt
+} | tee ./wlanpi-be200-$1.txt
 
 
 sudo service hostapd stop
