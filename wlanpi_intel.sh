@@ -1,6 +1,6 @@
 #!/bin/bash
 #Need to automate grabbing the model from lsusb
-$intel_model="BE200"
+intel_model="BE200"
 
 
 sudo ip link set wlan0 down
