@@ -1,174 +1,174 @@
-country 00
-country AD
-country AE
-country AF
-country AI
-country AL
-country AM
-country AN
-country AR
-country AS
-country AT
-country AU
-country AW
-country AZ
-country BA
-country BB
-country BD
-country BE
-country BF
-country BG
-country BH
-country BL
-country BM
-country BN
-country BO
-country BR
-country BS
-country BT
-country BY
-country BZ
-country CA
-country CF
-country CH
-country CI
-country CL
-country CN
-country CO
-country CR
-country CU
-country CX
-country CY
-country CZ
-country DE
-country DK
-country DM
-country DO
-country DZ
-country EC
-country EE
-country EG
-country ES
-country ET
-country FI
-country FM
-country FR
-country GB
-country GD
-country GE
-country GF
-country GH
-country GL
-country GP
-country GR
-country GT
-country GU
-country GY
-country HK
-country HN
-country HR
-country HT
-country HU
-country ID
-country IE
-country IL
-country IN
-country IR
-country IS
-country IT
-country JM
-country JO
-country JP
-country KE
-country KH
-country KN
-country KP
-country KR
-country KW
-country KY
-country KZ
-country LB
-country LC
-country LI
-country LK
-country LS
-country LT
-country LU
-country LV
-country MA
-country MC
-country MD
-country ME
-country MF
-country MH
-country MK
-country MN
-country MO
-country MP
-country MQ
-country MR
-country MT
-country MU
-country MV
-country MW
-country MX
-country MY
-country NG
-country NI
-country NL
-country NO
-country NP
-country NZ
-country OM
-country PA
-country PE
-country PF
-country PG
-country PH
-country PK
-country PL
-country PM
-country PR
-country PT
-country PW
-country PY
-country QA
-country RE
-country RO
-country RS
-country RU
-country RW
-country SA
-country SE
-country SG
-country SI
-country SK
-country SN
-country SR
-country SV
-country SY
-country TC
-country TD
-country TG
-country TH
-country TN
-country TR
-country TT
-country TW
-country TZ
-country UA
-country UG
-country US
-country UY
-country UZ
-country VC
-country VE
-country VI
-country VN
-country VU
-country WF
-country WS
-country YE
-country YT
-country ZA
-country ZW
+00
+AD
+AE
+AF
+AI
+AL
+AM
+AN
+AR
+AS
+AT
+AU
+AW
+AZ
+BA
+BB
+BD
+BE
+BF
+BG
+BH
+BL
+BM
+BN
+BO
+BR
+BS
+BT
+BY
+BZ
+CA
+CF
+CH
+CI
+CL
+CN
+CO
+CR
+CU
+CX
+CY
+CZ
+DE
+DK
+DM
+DO
+DZ
+EC
+EE
+EG
+ES
+ET
+FI
+FM
+FR
+GB
+GD
+GE
+GF
+GH
+GL
+GP
+GR
+GT
+GU
+GY
+HK
+HN
+HR
+HT
+HU
+ID
+IE
+IL
+IN
+IR
+IS
+IT
+JM
+JO
+JP
+KE
+KH
+KN
+KP
+KR
+KW
+KY
+KZ
+LB
+LC
+LI
+LK
+LS
+LT
+LU
+LV
+MA
+MC
+MD
+ME
+MF
+MH
+MK
+MN
+MO
+MP
+MQ
+MR
+MT
+MU
+MV
+MW
+MX
+MY
+NG
+NI
+NL
+NO
+NP
+NZ
+OM
+PA
+PE
+PF
+PG
+PH
+PK
+PL
+PM
+PR
+PT
+PW
+PY
+QA
+RE
+RO
+RS
+RU
+RW
+SA
+SE
+SG
+SI
+SK
+SN
+SR
+SV
+SY
+TC
+TD
+TG
+TH
+TN
+TR
+TT
+TW
+TZ
+UA
+UG
+US
+UY
+UZ
+VC
+VE
+VI
+VN
+VU
+WF
+WS
+YE
+YT
+ZA
+ZW
