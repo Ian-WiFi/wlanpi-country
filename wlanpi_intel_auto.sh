@@ -76,7 +76,7 @@ endTime=`date +%s`
 #used for calculating and displaying time at the end of the script for 1 country
 echo Execution time was `expr $endTime - $startTime` seconds.
 
-#used for repeating the loop on the next file?
+#used for repeating the read loop on the next file?
 done < "$INFILE"
 
 #getting total ending time
