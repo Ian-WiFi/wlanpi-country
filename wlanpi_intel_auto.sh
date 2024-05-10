@@ -1,56 +1,85 @@
 #!/bin/bash
-
-startA=`date +%s`
-
+#used for calculating total time
+startTotalTime=`date +%s`
 
 # Define the input file
 INFILE=./country.txt
 
+#Need to automate grabbing the model from lsusb
+intel_model="BE200"
 
 # Read the input file line by line
 while read -r LINE
 do
 
-start=`date +%s`
+#storing current time, used for calculating time at the start of the loop for 1 country
+startTime=`date +%s`
 
+#reset of interfaces, I cant remember why
 sudo ip link set wlan0 down
 sudo ip link set wlan0 up
 
+#this is used for putting the entire output of into a file.
 {
+#displays what country code is being used
 echo "This is for the Country code of $LINE"
 
+#dispays what model of WIFI card is connected
 echo "lsusb"
 lsusb
+
+#displays details of the wireless card
 echo "sudo lspci -v"
 sudo lspci -v
+
+#displays what intel firmware is being used
 echo "dmesg | grep ucode"
 dmesg | grep ucode
+
+#displays capabilities of the wireless card
 echo "sudo iw wlan0 scan"
 sudo iw wlan0 scan
+
+#sets the country code
 echo "sudo iw reg set "$1
 sudo iw reg set $1
+
+#displays the frequency list
 echo "iw reg get"
 iw reg get
+
+#displays capabilities based on country code
 echo "iw list"
 iw list
+
+#displays more capabilities based on country code
 echo "iw phy0 info"
 iw phy0 info
+
+#displays detailed info about the channels
 echo "iw phy0 channels"
 iw phy0 channels
 
-end=`date +%s`
-echo Execution time was `expr $end - $start` seconds.
+#getting ending time inside of loop
+endTime=`date +%s`
+#used for calculating and displaying time at the end of the loop for 1 country
+echo Execution time was `expr $endTime - $startTime` seconds.
 
+#stores all of the output into a file based on model and country code
+} | tee ./wlanpi-$intel_model-$LINE.txt
 
-} | tee ./wlanpi-be200-$LINE.txt
-
+#pauses for 5 seconds
 time sleep 5
 
-end=`date +%s`
-echo Execution time was `expr $end - $start` seconds.
+#getting ending time outside of loop
+endTime=`date +%s`
+#used for calculating and displaying time at the end of the script for 1 country
+echo Execution time was `expr $endTime - $startTime` seconds.
 
-
+#used for repeating the loop on the next file?
 done < "$INFILE"
 
-endA=`date +%s`
-echo Total Execution time was `expr $endA - $startA` seconds.
+#getting total ending time
+endTotalTime=`date +%s`
+#used for calculating and displaying the total time at the end of the script
+echo Total Execution time was `expr $endTotalTime - $startTotalTime` seconds.

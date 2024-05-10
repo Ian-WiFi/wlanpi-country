@@ -1,4 +1,6 @@
 #!/bin/bash
+#Currently this takes a single command (Country Code) as input.
+
 #Need to automate grabbing the model from lsusb
 intel_model="BE200"
 
@@ -30,7 +32,7 @@ lsusb
 echo "sudo lspci -v"
 sudo lspci -v
 
-#displays what intel firmware is being used.
+#displays what intel firmware is being used
 echo "dmesg | grep ucode"
 dmesg | grep ucode
 
@@ -58,7 +60,7 @@ iw phy0 info
 echo "iw phy0 channels"
 iw phy0 channels
 
-#stores all of the output into a file
+#stores all of the output into a file based on model and country code
 } | tee ./$intel_model/wlanpi-$intel_model-$1.txt
 
 #stops hostapd
