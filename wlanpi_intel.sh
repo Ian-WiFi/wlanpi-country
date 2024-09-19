@@ -16,7 +16,7 @@ echo 'country_code='$1> ./hostapd-script.conf
 cat ./hostapd-script.conf.bak |tail -n+2>> ./hostapd-script.conf
 
 #Launch hostapd
-sudo hostapd ./hostapd-script.conf
+sudo hostapd ./hostapd-script.conf &
 
 
 #this is used for putting the entire output of into a file.
