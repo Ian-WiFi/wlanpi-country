@@ -17,7 +17,8 @@ cat ./hostapd-script.conf.bak |tail -n+2>> ./hostapd-script.conf
 
 #Launch hostapd
 sudo hostapd ./hostapd-script.conf &
-
+HOSTAPD_PID=$!
+echo "hostapd started with PID: $HOSTAPD_PID"
 
 #this is used for putting the entire output of into a file.
 {
@@ -63,5 +64,12 @@ iw phy0 channels
 #stores all of the output into a file based on model and country code
 } | tee ./$intel_model/wlanpi-$intel_model-$1.txt
 
+# Wait for some time if needed (or perform other tasks)
+sleep 10  # Adjust this as necessary for your use case
+
+# Terminate all hostapd processes related to the specific config file
+echo "Killing all hostapd processes related to ./hostapd-script.conf"
+sudo pkill -f "hostapd ./hostapd-script.conf"
+
 #stops hostapd
-sudo service hostapd stop
+#sudo service hostapd stop
