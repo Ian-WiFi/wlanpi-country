@@ -3,7 +3,7 @@
 startTotalTime=`date +%s`
 
 # Define the input file
-INFILE=./country_test.txt
+INFILE=./country-codes.txt
 
 #Need to automate grabbing the model from lsusb
 intel_model="BE200"
@@ -80,15 +80,15 @@ echo Execution time was `expr $endTime - $startTime` seconds.
 #stores all of the output into a file based on model and country code
 } | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
 
-#pauses for 2 seconds
-time sleep 2
+#pauses for 1 seconds
+time sleep 1
 
 # Terminate all hostapd processes related to the specific config file
 echo "Killing all hostapd processes related to ./hostapd-script.conf"
 sudo pkill -f "hostapd ./hostapd-script.conf"
 
-#pauses for 2 seconds
-time sleep 2
+#pauses for 1 seconds
+time sleep 1
 
 #getting ending time outside of loop
 endTime=`date +%s`
