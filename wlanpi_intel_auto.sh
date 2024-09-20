@@ -3,7 +3,7 @@
 startTotalTime=`date +%s`
 
 # Define the input file
-INFILE=./country.txt
+INFILE=./country_test.txt
 
 #Need to automate grabbing the model from lsusb
 intel_model="BE200"
@@ -18,6 +18,18 @@ startTime=`date +%s`
 #reset of interfaces, I cant remember why
 sudo ip link set wlan0 down
 sudo ip link set wlan0 up
+
+#copy the current conf for hostapd save it as a backup
+cp ./hostapd-script.conf ./hostapd-script.conf.bak
+#add the country code used as an input to the script to a new hostapd conf
+echo 'country_code='$LINE> ./hostapd-script.conf
+#add everything from old file to a new one starting from second line
+cat ./hostapd-script.conf.bak |tail -n+2>> ./hostapd-script.conf
+
+#Launch hostapd
+sudo hostapd ./hostapd-script.conf &
+HOSTAPD_PID=$!
+echo "hostapd started with PID: $HOSTAPD_PID"
 
 #this is used for putting the entire output of into a file.
 {
@@ -41,8 +53,8 @@ echo "sudo iw wlan0 scan"
 sudo iw wlan0 scan
 
 #sets the country code
-echo "sudo iw reg set "$1
-sudo iw reg set $1
+echo "sudo iw reg set "$LINE
+sudo iw reg set $LINE
 
 #displays the frequency list
 echo "iw reg get"
@@ -66,10 +78,17 @@ endTime=`date +%s`
 echo Execution time was `expr $endTime - $startTime` seconds.
 
 #stores all of the output into a file based on model and country code
-} | tee ./wlanpi-$intel_model-$LINE.txt
+} | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
 
-#pauses for 5 seconds
-time sleep 5
+#pauses for 2 seconds
+time sleep 2
+
+# Terminate all hostapd processes related to the specific config file
+echo "Killing all hostapd processes related to ./hostapd-script.conf"
+sudo pkill -f "hostapd ./hostapd-script.conf"
+
+#pauses for 2 seconds
+time sleep 2
 
 #getting ending time outside of loop
 endTime=`date +%s`
