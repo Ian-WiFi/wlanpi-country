@@ -65,7 +65,7 @@ iw phy0 channels
 } | tee ./$intel_model/wlanpi-$intel_model-$1.txt
 
 # Wait for some time if needed (or perform other tasks)
-sleep 10  # Adjust this as necessary for your use case
+sleep 1  # Adjust this as necessary for your use case
 
 # Terminate all hostapd processes related to the specific config file
 echo "Killing all hostapd processes related to ./hostapd-script.conf"
