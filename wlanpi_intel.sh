@@ -5,8 +5,8 @@
 intel_model="BE200"
 
 #reset of interfaces, I cant remember why
-sudo ip link set wlan0 down
-sudo ip link set wlan0 up
+sudo ip link set wlan1 down
+sudo ip link set wlan1 up
 
 #copy the current conf for hostapd save it as a backup
 cp ./hostapd-script.conf ./hostapd-script.conf.bak
@@ -38,7 +38,7 @@ echo "dmesg | grep ucode"
 dmesg | grep ucode
 
 #displays capabilities of the wireless card
-echo "sudo iw wlan0 scan"
+echo "sudo iw wlan1 scan"
 sudo iw wlan0 scan
 
 #sets the country code
