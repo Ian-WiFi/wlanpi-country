@@ -13,7 +13,7 @@ else
   echo "Folder already exists: $intel_model"
 fi
 
-#reset of interfaces, I cant remember why
+#reset of interfaces used for hostapd, I cant remember why
 sudo ip link set wlan1 down
 sudo ip link set wlan1 up
 
