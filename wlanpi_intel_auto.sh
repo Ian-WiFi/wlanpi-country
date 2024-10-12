@@ -8,6 +8,15 @@ INFILE=./country-codes.txt
 #Need to automate grabbing the model from lsusb
 intel_model="BE200"
 
+# Check if the folder exists
+if [ ! -d "$intel_model" ]; then
+  # If the folder doesn't exist, create it
+  mkdir -p "$intel_model"
+  echo "Folder created: $intel_model"
+else
+  echo "Folder already exists: $intel_model"
+fi
+
 # Read the input file line by line
 while read -r LINE
 do
