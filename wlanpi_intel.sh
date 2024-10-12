@@ -4,6 +4,15 @@
 #Need to automate grabbing the model from lsusb
 intel_model="BE200"
 
+# Check if the folder exists
+if [ ! -d "$intel_model" ]; then
+  # If the folder doesn't exist, create it
+  mkdir -p "$intel_model"
+  echo "Folder created: $intel_model"
+else
+  echo "Folder already exists: $intel_model"
+fi
+
 #reset of interfaces, I cant remember why
 sudo ip link set wlan1 down
 sudo ip link set wlan1 up
