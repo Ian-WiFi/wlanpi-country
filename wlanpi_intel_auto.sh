@@ -50,7 +50,7 @@ dmesg | grep ucode
 
 #displays capabilities of the wireless card
 echo "sudo iw wlan0 scan"
-sudo iw wlan1 scan
+sudo iw wlan0 scan
 
 #sets the country code
 echo "sudo iw reg set "$LINE
