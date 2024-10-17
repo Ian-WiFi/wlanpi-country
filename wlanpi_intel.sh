@@ -1,8 +1,10 @@
 #!/bin/bash
 #Currently this takes a single command (Country Code) as input.
 
+#this will grep the output and grab the 9th word in the command which should be BE200 or AX210
+intel_model=$(lsusb | grep -E 'BE200|AX210' | awk '{print $9}')
 #Need to automate grabbing the model from lsusb
-intel_model="BE200"
+#intel_model="BE200"
 
 # Check if the folder exists
 if [ ! -d "$intel_model" ]; then
