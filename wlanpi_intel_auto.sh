@@ -6,7 +6,13 @@ startTotalTime=`date +%s`
 INFILE=./country-codes.txt
 
 #grabbing the model from lspci
-intel_model=$(lspci | grep -E -i 'AX210|BE200' | awk -F ': ' '{print $2}' | grep -oE 'AX210|BE200' | head -n 1)
+# Safely detect the Intel model from the PCIe bus
+intel_model=$(lspci | grep -oE -i 'AX210|BE200' | tr '[:lower:]' '[:upper:]' | head -n 1)
+
+# Bulletproof fallback: If the command above is somehow still blank, default to BE200
+if [ -z "$intel_model" ]; then
+  intel_model="BE200"
+fi
 
 # Check if the folder exists
 if [ ! -d "$intel_model" ]; then
