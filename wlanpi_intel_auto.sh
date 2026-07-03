@@ -5,8 +5,8 @@ startTotalTime=`date +%s`
 # Define the input file
 INFILE=./country-codes.txt
 
-#Need to automate grabbing the model from lsusb
-intel_model="BE200"
+#grabbing the model from lspci
+intel_model=$(lspci | grep -E -i 'AX210|BE200' | awk -F ': ' '{print $2}' | grep -oE 'AX210|BE200' | head -n 1)
 
 # Check if the folder exists
 if [ ! -d "$intel_model" ]; then
@@ -22,11 +22,18 @@ while read -r LINE
 do
 
 #storing current time, used for calculating time at the start of the loop for 1 country
-startTime=`date +%s`
+LINE=$(echo "$LINE" | tr -d '\r')
+  if [ -z "$LINE" ] || [[ "$LINE" == \#* ]]; then continue; fi
+  startTime=$(date +%s)
 
 #reset of interfaces, I cant remember why
 sudo ip link set wlan1 down
 sudo ip link set wlan1 up
+
+# After hostapd starts (Clears the Intel client card):
+sleep 3
+sudo ip link set wlan0 down
+sudo ip link set wlan0 up
 
 #copy the current conf for hostapd save it as a backup
 cp ./hostapd-script.conf ./hostapd-script.conf.bak
