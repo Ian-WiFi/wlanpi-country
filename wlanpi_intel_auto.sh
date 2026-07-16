@@ -26,111 +26,120 @@ fi
 # Read the input file line by line
 while read -r LINE
 do
-
-#storing current time, used for calculating time at the start of the loop for 1 country
-LINE=$(echo "$LINE" | tr -d '\r')
+  LINE=$(echo "$LINE" | tr -d '\r')
   if [ -z "$LINE" ] || [[ "$LINE" == \#* ]]; then continue; fi
   startTime=$(date +%s)
 
-#reset of interfaces, I cant remember why
-sudo ip link set wlan1 down
-sudo ip link set wlan1 up
+  echo "=========================================="
+  echo "Processing Country Code: $LINE"
+  echo "=========================================="
 
-# After hostapd starts (Clears the Intel client card):
-sleep 3
-sudo ip link set wlan0 down
-sudo ip link set wlan0 up
+  # 1. KILL EXISTING HOSTAPD PROCESSES FIRST
+  # This frees up the driver so it can actually be unloaded
+  echo "Stopping any running hostapd processes..."
+  sudo pkill -f "hostapd ./hostapd-script.conf" 2>/dev/null
+  sleep 1
 
-# Give hostapd time to start broadcasting beacons
-sleep 3
+  # 2. BRING INTERFACES DOWN (Crucial for freeing the module)
+  echo "Bringing wireless interfaces down..."
+  sudo ip link set wlan0 down 2>/dev/null
+  sudo ip link set wlan1 down 2>/dev/null
+  sleep 1
 
-# 4. RESET INTEL DRIVER (Forces LAR to clear cache)
-echo "Resetting iwlwifi driver..."
-sudo modprobe -r iwlmvm iwlwifi
-sleep 1
-sudo modprobe iwlwifi
-sleep 2 # Let the driver settle
+  # 3. RESET INTEL DRIVER (Forces LAR to clear cache)
+  # Unloading iwlmvm first ensures iwlwifi isn't blocked by its child module
+  echo "Resetting iwlwifi driver..."
+  sudo modprobe -r iwlmvm 2>/dev/null
+  sudo modprobe -r iwlwifi 2>/dev/null
+  sleep 1.5
+  sudo modprobe iwlwifi
+  sleep 3 # Let the driver settle and recreate the interfaces
 
-#copy the current conf for hostapd save it as a backup
-cp ./hostapd-script.conf ./hostapd-script.conf.bak
-#add the country code used as an input to the script to a new hostapd conf
-echo 'country_code='$LINE> ./hostapd-script.conf
-#add everything from old file to a new one starting from second line
-cat ./hostapd-script.conf.bak |tail -n+2>> ./hostapd-script.conf
+  # Bring interfaces back up so hostapd/iw can use them
+  sudo ip link set wlan0 up 2>/dev/null
+  sudo ip link set wlan1 up 2>/dev/null
+  sleep 1
 
-#Launch hostapd
-sudo hostapd ./hostapd-script.conf &
-HOSTAPD_PID=$!
-echo "hostapd started with PID: $HOSTAPD_PID"
+  # 4. PREPARE NEW HOSTAPD CONFIG
+  # copy the current conf for hostapd save it as a backup
+  cp ./hostapd-script.conf ./hostapd-script.conf.bak
+  # add the country code used as an input to the script to a new hostapd conf
+  echo 'country_code='$LINE > ./hostapd-script.conf
+  # add everything from old file to a new one starting from second line
+  tail -n+2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
 
-#this is used for putting the entire output of into a file.
-{
-#displays what country code is being used
-echo "This is for the Country code of $LINE"
+  # 5. LAUNCH HOSTAPD IN BACKGROUND
+  sudo hostapd ./hostapd-script.conf &
+  HOSTAPD_PID=$!
+  echo "hostapd started with PID: $HOSTAPD_PID"
 
-#dispays what model of WIFI card is connected
-echo "lsusb"
-lsusb
+  # Give hostapd time to start broadcasting and clear Intel's LAR cache
+  sleep 5
 
-#displays details of the wireless card
-echo "sudo lspci -v"
-sudo lspci -v
+  # 6. GATHER LOGS AND METADATA
+  # This is used for putting the entire output into a file.
+  {
+    #displays what country code is being used
+    echo "This is for the Country code of $LINE"
 
-#displays what intel firmware is being used
-echo "dmesg | grep ucode"
-dmesg | grep ucode
+    #displays what model of WIFI card is connected
+    echo "lsusb"
+    lsusb
 
-#displays capabilities of the wireless card
-echo "sudo iw wlan0 scan"
-sudo iw wlan0 scan
+    #displays details of the wireless card
+    echo "sudo lspci -v"
+    sudo lspci -v
 
-#sets the country code
-echo "sudo iw reg set "$LINE
-sudo iw reg set $LINE
+    #displays what intel firmware is being used
+    echo "dmesg | grep ucode"
+    dmesg | grep ucode
 
-#displays the frequency list
-echo "iw reg get"
-iw reg get
+    #displays capabilities of the wireless card
+    echo "sudo iw wlan0 scan"
+    sudo iw wlan0 scan
 
-#displays capabilities based on country code
-echo "iw list"
-iw list
+    #sets the country code
+    echo "sudo iw reg set $LINE"
+    sudo iw reg set $LINE
 
-#displays more capabilities based on country code
-echo "iw phy0 info"
-iw phy0 info
+    #displays the frequency list
+    echo "iw reg get"
+    iw reg get
 
-#displays detailed info about the channels
-echo "iw phy0 channels"
-iw phy0 channels
+    #displays capabilities based on country code
+    echo "iw list"
+    iw list
 
-#getting ending time inside of loop
-endTime=`date +%s`
-#used for calculating and displaying time at the end of the loop for 1 country
-echo Execution time was `expr $endTime - $startTime` seconds.
+    #displays more capabilities based on country code
+    echo "iw phy0 info"
+    iw phy0 info
 
-#stores all of the output into a file based on model and country code
-} | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
+    #displays detailed info about the channels
+    echo "iw phy0 channels"
+    iw phy0 channels
 
-#pauses for 1 seconds
-time sleep 1
+    #getting ending time inside of loop
+    endTime=`date +%s`
+    #used for calculating and displaying time at the end of the loop for 1 country
+    echo "Execution time was $(expr $endTime - $startTime) seconds."
 
-# Terminate all hostapd processes related to the specific config file
-echo "Killing all hostapd processes related to ./hostapd-script.conf"
-sudo pkill -f "hostapd ./hostapd-script.conf"
+    #stores all of the output into a file based on model and country code
+  } | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
 
-#pauses for 1 seconds
-time sleep 1
+  # 7. CLEANUP AT END OF LOOP
+  echo "Tearing down hostapd for $LINE..."
+  sudo pkill -f "hostapd ./hostapd-script.conf"
+  sudo ip link set wlan0 down 2>/dev/null
+  sudo ip link set wlan1 down 2>/dev/null
+  sleep 1
 
-#getting ending time outside of loop
-endTime=`date +%s`
-#used for calculating and displaying time at the end of the script for 1 country
-echo Execution time was `expr $endTime - $startTime` seconds.
+  #getting ending time outside of loop
+  endTime=`date +%s`
+  echo "Loop execution time for $LINE was $(expr $endTime - $startTime) seconds."
 
-#used for repeating the read loop on the next file?
 done < "$INFILE"
 
 #getting total ending time
 endTotalTime=`date +%s`
 #used for calculating and displaying the total time at the end of the script
-echo Total Execution time was `expr $endTotalTime - $startTotalTime` seconds.
+echo "Total Execution time was $(expr $endTotalTime - $startTotalTime) seconds."
