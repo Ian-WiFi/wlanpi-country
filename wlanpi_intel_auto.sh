@@ -38,12 +38,10 @@ reset_intel_driver() {
   echo "Unloading iwlwifi driver..."
   sudo modprobe -r iwlmvm 2>/dev/null
   sudo modprobe -r iwlwifi 2>/dev/null
-  # Crucial: Give the PCIe bus host bridge plenty of time to clear active states
   sleep 4 
 
   echo "Reloading iwlwifi driver..."
   sudo modprobe iwlwifi
-  # Crucial: Give the driver and PCIe link ample time to settle/renegotiate
   sleep 6 
 }
 
@@ -70,25 +68,18 @@ do
   sudo ip link set wlan1 up 2>/dev/null
   sleep 2
 
-  # Check if we should skip hostapd (for '00' world safe mode)
-  if [ "$LINE" = "00" ]; then
-    echo "Country code is '00'. Skipping hostapd startup to prevent errors."
-    HOSTAPD_ACTIVE="no"
-  else
-    HOSTAPD_ACTIVE="yes"
-    # Prepare new hostapd config
-    cp ./hostapd-script.conf ./hostapd-script.conf.bak
-    echo 'country_code='$LINE > ./hostapd-script.conf
-    tail -n+2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
+  # Prepare new hostapd config
+  cp ./hostapd-script.conf ./hostapd-script.conf.bak
+  echo 'country_code='$LINE > ./hostapd-script.conf
+  tail -n+2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
 
-    # Launch hostapd in the background
-    sudo hostapd ./hostapd-script.conf &
-    HOSTAPD_PID=$!
-    echo "hostapd started with PID: $HOSTAPD_PID"
-    
-    # Give hostapd time to issue beacons and force LAR update
-    sleep 5
-  fi
+  # Launch hostapd in the background
+  sudo hostapd ./hostapd-script.conf &
+  HOSTAPD_PID=$!
+  echo "hostapd started with PID: $HOSTAPD_PID"
+  
+  # Give hostapd time to issue beacons and force LAR update
+  sleep 5
 
   # Gather logs and capabilities
   {
@@ -105,23 +96,14 @@ do
     sudo iw reg set $LINE
     echo "iw reg get"
     iw reg get
-    
-    # NOTE: 'iw list' has been omitted here to prevent system lockups. 
-    # Using safer, device-targeted alternatives:
-    echo "iw phy0 info"
-    iw phy0 info
-    echo "iw phy0 channels"
-    iw phy0 channels
 
     endTime=`date +%s`
     echo "Execution time was $(expr $endTime - $startTime) seconds."
   } | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
 
   # Cleanup at end of this country's loop iteration
-  if [ "$HOSTAPD_ACTIVE" = "yes" ]; then
-    echo "Tearing down hostapd for $LINE..."
-    sudo pkill -f "hostapd ./hostapd-script.conf"
-  fi
+  echo "Tearing down hostapd for $LINE..."
+  sudo pkill -f "hostapd ./hostapd-script.conf"
   
   sudo ip link set wlan0 down 2>/dev/null
   sudo ip link set wlan1 down 2>/dev/null
