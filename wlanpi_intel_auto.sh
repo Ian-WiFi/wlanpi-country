@@ -25,24 +25,26 @@ fi
 echo "Stopping system wireless services to free the driver..."
 sudo systemctl stop wpa_supplicant 2>/dev/null
 sudo systemctl stop NetworkManager 2>/dev/null
-sudo systemctl stop wlanpi-profiler 2>/dev/null # Stop WLAN Pi specific tools if running
+sudo systemctl stop wlanpi-profiler 2>/dev/null
+sleep 2
 
 # Helper function to bring down interfaces and force driver reload
 reset_intel_driver() {
   echo "Bringing wireless interfaces down..."
   sudo ip link set wlan0 down 2>/dev/null
   sudo ip link set wlan1 down 2>/dev/null
-  sleep 1
+  sleep 2
 
   echo "Unloading iwlwifi driver..."
-  # Explicitly unload dependent modules first
   sudo modprobe -r iwlmvm 2>/dev/null
   sudo modprobe -r iwlwifi 2>/dev/null
-  sleep 2
+  # Crucial: Give the PCIe bus host bridge plenty of time to clear active states
+  sleep 4 
 
   echo "Reloading iwlwifi driver..."
   sudo modprobe iwlwifi
-  sleep 3 # Give kernel plenty of time to re-initialize the hardware
+  # Crucial: Give the driver and PCIe link ample time to settle/renegotiate
+  sleep 6 
 }
 
 # Read the input file line by line
@@ -56,7 +58,7 @@ do
   echo "Processing Country Code: $LINE"
   echo "=========================================="
 
-  # Clean up any lingering hostapd processes
+  # Clean up any lingering hostapd processes from previous runs
   sudo pkill -f "hostapd ./hostapd-script.conf" 2>/dev/null
   sleep 1
 
@@ -66,20 +68,27 @@ do
   # Bring interfaces up post-reload
   sudo ip link set wlan0 up 2>/dev/null
   sudo ip link set wlan1 up 2>/dev/null
-  sleep 1
+  sleep 2
 
-  # Prepare new hostapd config
-  cp ./hostapd-script.conf ./hostapd-script.conf.bak
-  echo 'country_code='$LINE > ./hostapd-script.conf
-  tail -n+2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
+  # Check if we should skip hostapd (for '00' world safe mode)
+  if [ "$LINE" = "00" ]; then
+    echo "Country code is '00'. Skipping hostapd startup to prevent errors."
+    HOSTAPD_ACTIVE="no"
+  else
+    HOSTAPD_ACTIVE="yes"
+    # Prepare new hostapd config
+    cp ./hostapd-script.conf ./hostapd-script.conf.bak
+    echo 'country_code='$LINE > ./hostapd-script.conf
+    tail -n+2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
 
-  # Launch hostapd in the background
-  sudo hostapd ./hostapd-script.conf &
-  HOSTAPD_PID=$!
-  echo "hostapd started with PID: $HOSTAPD_PID"
-  
-  # Crucial: Give hostapd time to issue beacons and force LAR update
-  sleep 5
+    # Launch hostapd in the background
+    sudo hostapd ./hostapd-script.conf &
+    HOSTAPD_PID=$!
+    echo "hostapd started with PID: $HOSTAPD_PID"
+    
+    # Give hostapd time to issue beacons and force LAR update
+    sleep 5
+  fi
 
   # Gather logs and capabilities
   {
@@ -89,15 +98,16 @@ do
     echo "sudo lspci -v"
     sudo lspci -v
     echo "dmesg | grep ucode"
-    dmesg | grep ucode | tail -n 10 # Only show the latest loads to keep file clean
+    dmesg | grep ucode | tail -n 10
     echo "sudo iw wlan0 scan"
     sudo iw wlan0 scan
     echo "sudo iw reg set $LINE"
     sudo iw reg set $LINE
     echo "iw reg get"
     iw reg get
-    echo "iw list"
-    iw list
+    
+    # NOTE: 'iw list' has been omitted here to prevent system lockups. 
+    # Using safer, device-targeted alternatives:
     echo "iw phy0 info"
     iw phy0 info
     echo "iw phy0 channels"
@@ -108,11 +118,14 @@ do
   } | tee ./$intel_model/wlanpi-$intel_model-$LINE.txt
 
   # Cleanup at end of this country's loop iteration
-  echo "Tearing down hostapd for $LINE..."
-  sudo pkill -f "hostapd ./hostapd-script.conf"
+  if [ "$HOSTAPD_ACTIVE" = "yes" ]; then
+    echo "Tearing down hostapd for $LINE..."
+    sudo pkill -f "hostapd ./hostapd-script.conf"
+  fi
+  
   sudo ip link set wlan0 down 2>/dev/null
   sudo ip link set wlan1 down 2>/dev/null
-  sleep 1
+  sleep 2
 
   endTime=`date +%s`
   echo "Loop execution time for $LINE was $(expr $endTime - $startTime) seconds."
