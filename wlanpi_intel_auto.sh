@@ -41,6 +41,16 @@ sleep 3
 sudo ip link set wlan0 down
 sudo ip link set wlan0 up
 
+# Give hostapd time to start broadcasting beacons
+sleep 3
+
+# 4. RESET INTEL DRIVER (Forces LAR to clear cache)
+echo "Resetting iwlwifi driver..."
+sudo modprobe -r iwlmvm iwlwifi
+sleep 1
+sudo modprobe iwlwifi
+sleep 2 # Let the driver settle
+
 #copy the current conf for hostapd save it as a backup
 cp ./hostapd-script.conf ./hostapd-script.conf.bak
 #add the country code used as an input to the script to a new hostapd conf
