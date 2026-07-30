@@ -1,86 +1,73 @@
 #!/bin/bash
-#Currently this takes a single command (Country Code) as input.
+# Usage: ./run_lar_test.sh <CountryCode> (e.g., ./run_lar_test.sh BZ)
 
-#this will grep the output and grab the 9th word in the command which should be BE200 or AX210
-intel_model=$(lsusb | grep -E 'BE200|AX210' | awk '{print $9}')
-#Need to automate grabbing the model from lsusb
-#intel_model="BE200"
-
-# Check if the folder exists
-if [ ! -d "$intel_model" ]; then
-  # If the folder doesn't exist, create it
-  mkdir -p "$intel_model"
-  echo "Folder created: $intel_model"
-else
-  echo "Folder already exists: $intel_model"
+if [ -z "$1" ]; then
+  echo "Error: Please supply a 2-letter Country Code (e.g., ./run_lar_test.sh BZ)"
+  exit 1
 fi
 
-#reset of interfaces used for hostapd, I cant remember why
-sudo ip link set wlan1 down
-sudo ip link set wlan1 up
+COUNTRY=$1
 
-#copy the current conf for hostapd save it as a backup
+# 1. Grab Intel model from lspci (PCIe card)
+intel_model=$(lspci | grep -iE 'Intel.*(Wi-Fi|Wireless|BE200|AX210|AX211)' | awk '{print $NF}')
+intel_model=${intel_model:-"Intel_BE200"}
+
+# Ensure target folder exists
+mkdir -p "$intel_model"
+echo "[+] Target Folder: $intel_model"
+
+# 2. Reset the correct AP interface (wlan2 = MediaTek Comfast)
+echo "[+] Resetting wlan2 interface..."
+sudo ip link set wlan2 down 2>/dev/null
+sudo ip link set wlan2 up 2>/dev/null
+
+# 3. Dynamic hostapd.conf creation
 cp ./hostapd-script.conf ./hostapd-script.conf.bak
-#add the country code used as an input to the script to a new hostapd conf
-echo 'country_code='$1> ./hostapd-script.conf
-#add everything from old file to a new one starting from second line
-cat ./hostapd-script.conf.bak |tail -n+2>> ./hostapd-script.conf
+echo "country_code=${COUNTRY}" > ./hostapd-script.conf
+tail -n +2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
 
-#Launch hostapd
-sudo hostapd ./hostapd-script.conf &
+# 4. Launch hostapd in background on wlan2
+echo "[+] Starting hostapd for Country: ${COUNTRY}..."
+sudo hostapd ./hostapd-script.conf > /dev/null 2>&1 &
 HOSTAPD_PID=$!
-echo "hostapd started with PID: $HOSTAPD_PID"
 
-#this is used for putting the entire output of into a file.
+# Give hostapd 4 seconds to initialize the 802.11d beacon on Ch 36
+sleep 4
+
+# 5. Capture LAR response data
+OUTPUT_FILE="./${intel_model}/wlanpi-${intel_model}-${COUNTRY}.txt"
+
 {
-#displays what country code is being used
-echo "This is for the Country code of $1"
+  echo "=================================================="
+  echo " LAR TEST RESULTS FOR COUNTRY CODE: ${COUNTRY}"
+  echo " Date: $(date)"
+  echo "=================================================="
 
-#dispays what model of WIFI card is connected
-echo "lsusb"
-lsusb
+  echo -e "\n--- Hardware Info ---"
+  lspci -v | grep -A 10 -i "Network controller"
 
-#displays details of the wireless card
-echo "sudo lspci -v"
-sudo lspci -v
+  echo -e "\n--- Intel Firmware (dmesg) ---"
+  dmesg | grep -i ucode | tail -n 10
 
-#displays what intel firmware is being used
-echo "dmesg | grep ucode"
-dmesg | grep ucode
+  echo -e "\n--- Triggering Active Probe Scan on wlan0 (Ch 36 / 5180MHz) ---"
+  # Target channel 36 specifically to hit hostapd's beacon
+  sudo iw dev wlan0 scan freqs 5180 > /dev/null 2>&1
+  sleep 2
 
-#displays capabilities of the wireless card
-echo "sudo iw wlan0 scan"
-sudo iw wlan0 scan
+  echo -e "\n--- Intel LAR Kernel Log Output ---"
+  dmesg | grep -i lar | tail -n 15
 
-#sets the country code
-echo "sudo iw reg set "$1
-sudo iw reg set $1
+  echo -e "\n--- Current Active Regulatory Domain (iw reg get) ---"
+  iw reg get
 
-#displays the frequency list
-echo "iw reg get"
-iw reg get
+  echo -e "\n--- Channel Capabilities (iw phy phy0 info) ---"
+  iw phy0 info
 
-#displays capabilities based on country code
-echo "iw list"
-iw list
+} | tee "$OUTPUT_FILE"
 
-#displays more capabilities based on country code
-echo "iw phy0 info"
-iw phy0 info
+# 6. Clean up hostapd
+echo "[+] Test complete for ${COUNTRY}. Stopping hostapd..."
+sudo kill -9 $HOSTAPD_PID 2>/dev/null
+sudo pkill -f "hostapd ./hostapd-script.conf" 2>/dev/null
 
-#displays detailed info about the channels
-echo "iw phy0 channels"
-iw phy0 channels
-
-#stores all of the output into a file based on model and country code
-} | tee ./$intel_model/wlanpi-$intel_model-$1.txt
-
-# Wait for some time if needed (or perform other tasks)
-sleep 1  # Adjust this as necessary for your use case
-
-# Terminate all hostapd processes related to the specific config file
-echo "Killing all hostapd processes related to ./hostapd-script.conf"
-sudo pkill -f "hostapd ./hostapd-script.conf"
-
-#stops hostapd
-#sudo service hostapd stop
+echo "[+] Results saved to: $OUTPUT_FILE"
