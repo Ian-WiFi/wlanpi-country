@@ -132,7 +132,7 @@ echo "hostapd confirmed up (AP-ENABLED seen in log)."
     iw reg get
 
     echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines (driver's own LAR record) ---"
-    dmesg | grep -i "get_regdomain\|alpha2" | tail -5
+    dmesg | grep -i "get_regdomain\|alpha2" | tail -20
 
     echo "--- iw list ---"
     iw list
