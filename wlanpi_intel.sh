@@ -1,73 +1,149 @@
 #!/bin/bash
-# Usage: ./run_lar_test.sh <CountryCode> (e.g., ./run_lar_test.sh BZ)
+# Usage: ./wlanpi_intel.sh <COUNTRY_CODE> [intel_model]
+#   e.g. ./wlanpi_intel.sh BZ BE200
+set -uo pipefail
 
-if [ -z "$1" ]; then
-  echo "Error: Please supply a 2-letter Country Code (e.g., ./run_lar_test.sh BZ)"
-  exit 1
+country_code="${1:?Usage: $0 <COUNTRY_CODE> [intel_model]}"
+intel_model="${2:-BE200}"   # swap this arg when you swap cards; full auto-ID needs a PCI subsystem-ID lookup table
+
+# --- Locate the Intel DUT interface dynamically (don't hardcode wlan0/wlan1) ---
+find_dut_iface() {
+    for netdev in /sys/class/net/*; do
+        iface=$(basename "$netdev")
+        driver_path="$netdev/device/driver"
+        if [ -e "$driver_path" ]; then
+            driver=$(basename "$(readlink -f "$driver_path")")
+            if [ "$driver" = "iwlwifi" ]; then
+                echo "$iface"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+dut_iface=$(find_dut_iface || true)
+
+# The BE200 sometimes loses a boot-time probe race on this hardware and never
+# registers a wiphy at all (confirmed via dmesg: firmware loads and logs
+# "base HW address", then nothing further — no wiphy/interface created).
+# If that's happened, a clean driver reload fixes it. Self-heal once before
+# giving up.
+if [ -z "$dut_iface" ]; then
+    echo "No iwlwifi interface found — attempting a driver reload (known boot-race issue on this hardware)..."
+    sudo modprobe -r iwlmld 2>/dev/null
+    sudo modprobe -r iwlmvm 2>/dev/null
+    sudo modprobe -r iwlwifi 2>/dev/null
+    sleep 1
+    sudo modprobe iwlwifi
+    sleep 5
+    dut_iface=$(find_dut_iface || true)
 fi
 
-COUNTRY=$1
+if [ -z "$dut_iface" ]; then
+    echo "ERROR: no iwlwifi (Intel) interface found, even after a driver reload."
+    echo "Check the card is seated and not rfkill-blocked (rfkill list), and check dmesg for real errors."
+    exit 1
+fi
 
-# 1. Grab Intel model from lspci (PCIe card)
-intel_model=$(lspci | grep -iE 'Intel.*(Wi-Fi|Wireless|BE200|AX210|AX211)' | awk '{print $NF}')
-intel_model=${intel_model:-"Intel_BE200"}
+dut_phy=$(iw dev "$dut_iface" info | awk '/wiphy/{print "phy"$2}')
+echo "Using DUT interface: $dut_iface ($dut_phy)"
 
-# Ensure target folder exists
 mkdir -p "$intel_model"
-echo "[+] Target Folder: $intel_model"
 
-# 2. Reset the correct AP interface (wlan2 = MediaTek Comfast)
-echo "[+] Resetting wlan2 interface..."
-sudo ip link set wlan2 down 2>/dev/null
-sudo ip link set wlan2 up 2>/dev/null
+# Reset the DUT interface itself (not wlan1) to try to clear any stale scan cache.
+# NOTE: this may NOT clear firmware-cached LAR/MCC state between runs. If you see
+# a country "stick" from the previous test, you likely need to reload the driver:
+#   sudo modprobe -r iwlwifi iwlmvm; sudo modprobe iwlwifi
+sudo ip link set "$dut_iface" down
+sudo ip link set "$dut_iface" up
+sleep 1
 
-# 3. Dynamic hostapd.conf creation
+# Build this run's hostapd conf.
+# IMPORTANT: strip every existing country_code= line, wherever it appears,
+# rather than just replacing line 1. A previous bug in this script (or a
+# manual edit) can leave a stray/duplicate country_code line further down
+# the file, which hostapd will not handle the way you expect. This grep -v
+# approach is idempotent no matter how the file got into a bad state.
 cp ./hostapd-script.conf ./hostapd-script.conf.bak
-echo "country_code=${COUNTRY}" > ./hostapd-script.conf
-tail -n +2 ./hostapd-script.conf.bak >> ./hostapd-script.conf
+{ echo "country_code=$country_code"; grep -v '^country_code=' ./hostapd-script.conf.bak; } > ./hostapd-script.conf
 
-# 4. Launch hostapd in background on wlan2
-echo "[+] Starting hostapd for Country: ${COUNTRY}..."
-sudo hostapd ./hostapd-script.conf > /dev/null 2>&1 &
-HOSTAPD_PID=$!
+# Sanity check: fail loudly if somehow more than one country_code line made it in.
+cc_count=$(grep -c '^country_code=' ./hostapd-script.conf)
+if [ "$cc_count" -ne 1 ]; then
+    echo "ERROR: expected exactly 1 country_code line in hostapd-script.conf, found $cc_count. Aborting."
+    cat ./hostapd-script.conf
+    exit 1
+fi
 
-# Give hostapd 4 seconds to initialize the 802.11d beacon on Ch 36
-sleep 4
+# Launch hostapd — send its own stdout/stderr to a temp file (not into the
+# results folder) so we can check AP-ENABLED and print it on error, without
+# leaving a permanent per-country hostapd log lying around.
+hostapd_log=$(mktemp)
+trap 'rm -f "$hostapd_log"' EXIT
 
-# 5. Capture LAR response data
-OUTPUT_FILE="./${intel_model}/wlanpi-${intel_model}-${COUNTRY}.txt"
+sudo hostapd ./hostapd-script.conf > "$hostapd_log" 2>&1 &
+hostapd_pid=$!
+echo "hostapd started, pid $hostapd_pid"
+
+# Give the AP time to come up, but actually verify it succeeded rather than
+# just sleeping and hoping — a config error (like the duplicate country_code
+# bug this script used to have) can make hostapd exit or fail to enable the
+# AP, and a blind sleep would hide that completely.
+ap_up=0
+for i in $(seq 1 10); do
+    sleep 1
+    if grep -q "AP-ENABLED" "$hostapd_log" 2>/dev/null; then
+        ap_up=1
+        break
+    fi
+    if ! kill -0 "$hostapd_pid" 2>/dev/null; then
+        echo "ERROR: hostapd process died. Log follows:"
+        cat "$hostapd_log"
+        exit 1
+    fi
+done
+
+if [ "$ap_up" -ne 1 ]; then
+    echo "ERROR: hostapd did not report AP-ENABLED within 10s. Log follows:"
+    cat "$hostapd_log"
+    sudo pkill -f "hostapd ./hostapd-script.conf" || true
+    exit 1
+fi
+echo "hostapd confirmed up (AP-ENABLED seen in log)."
 
 {
-  echo "=================================================="
-  echo " LAR TEST RESULTS FOR COUNTRY CODE: ${COUNTRY}"
-  echo " Date: $(date)"
-  echo "=================================================="
+    echo "== Country code under test: $country_code =="
+    echo "== DUT model: $intel_model  iface: $dut_iface  phy: $dut_phy =="
 
-  echo -e "\n--- Hardware Info ---"
-  lspci -v | grep -A 10 -i "Network controller"
+    echo "--- lspci -vnn (Intel is PCIe, not USB - lsusb won't show it) ---"
+    sudo lspci -vnn | grep -A 10 -i network
 
-  echo -e "\n--- Intel Firmware (dmesg) ---"
-  dmesg | grep -i ucode | tail -n 10
+    echo "--- dmesg | grep ucode ---"
+    dmesg | grep ucode
 
-  echo -e "\n--- Triggering Active Probe Scan on wlan0 (Ch 36 / 5180MHz) ---"
-  # Target channel 36 specifically to hit hostapd's beacon
-  sudo iw dev wlan0 scan freqs 5180 > /dev/null 2>&1
-  sleep 2
+    echo "--- iw $dut_iface scan (this is what should trigger LAR) ---"
+    sudo iw "$dut_iface" scan
 
-  echo -e "\n--- Intel LAR Kernel Log Output ---"
-  dmesg | grep -i lar | tail -n 15
+    # give firmware a moment to process scan results and update its self-managed reg domain
+    sleep 2
 
-  echo -e "\n--- Current Active Regulatory Domain (iw reg get) ---"
-  iw reg get
+    echo "--- iw reg get (this is your actual LAR result) ---"
+    iw reg get
 
-  echo -e "\n--- Channel Capabilities (iw phy phy0 info) ---"
-  iw phy0 info
+    echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines (driver's own LAR record) ---"
+    dmesg | grep -i "get_regdomain\|alpha2" | tail -5
 
-} | tee "$OUTPUT_FILE"
+    echo "--- iw list ---"
+    iw list
 
-# 6. Clean up hostapd
-echo "[+] Test complete for ${COUNTRY}. Stopping hostapd..."
-sudo kill -9 $HOSTAPD_PID 2>/dev/null
-sudo pkill -f "hostapd ./hostapd-script.conf" 2>/dev/null
+    echo "--- iw $dut_phy info ---"
+    iw "$dut_phy" info
 
-echo "[+] Results saved to: $OUTPUT_FILE"
+    echo "--- iw $dut_phy channels ---"
+    iw "$dut_phy" channels
+} | tee "./$intel_model/wlanpi-$intel_model-$country_code.txt"
+
+sleep 1
+echo "Killing hostapd"
+sudo pkill -f "hostapd ./hostapd-script.conf" || true
