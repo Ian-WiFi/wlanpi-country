@@ -56,19 +56,26 @@ failed_countries=()
 skip_count=0
 
 while read -r LINE; do
+    # Strip a trailing \r in case country-codes.txt has Windows (CRLF) line
+    # endings — otherwise the country code silently carries a hidden \r
+    # into hostapd's config and into every output filename.
+    LINE="${LINE%$'\r'}"
+
     # Skip blank lines and comments in country-codes.txt
     [ -z "$LINE" ] && continue
     case "$LINE" in \#*) continue ;; esac
 
-    # Resume support: if a result file already exists for this country (from
-    # a prior run that got interrupted — crash, reboot, power loss, etc.),
-    # skip it instead of re-running. This lets you just re-launch the same
-    # command after an interruption instead of starting the whole sweep over.
-    # Delete the specific .txt file(s) in ./$intel_model/ if you want to force
-    # a re-test of a country you already have a result for.
+    # Resume support: if a COMPLETE result file already exists for this
+    # country (from a prior run that got interrupted — crash, reboot, power
+    # loss, etc.), skip it instead of re-running. A file only counts as
+    # complete if it contains the final "Execution time was" line this
+    # script writes at the very end of a successful run — a 0-byte or
+    # truncated file from a mid-write crash does NOT count, and will be
+    # re-run automatically. Delete a .txt file in ./$intel_model/ if you
+    # want to force a re-test regardless of its completion state.
     result_file="./$intel_model/wlanpi-$intel_model-$LINE.txt"
-    if [ -f "$result_file" ]; then
-        echo "Result already exists for $LINE, skipping (delete $result_file to force a re-run)."
+    if [ -s "$result_file" ] && grep -q "^Execution time was" "$result_file"; then
+        echo "Complete result already exists for $LINE, skipping (delete $result_file to force a re-run)."
         skip_count=$((skip_count + 1))
         continue
     fi
@@ -104,7 +111,11 @@ while read -r LINE; do
     # Reset the DUT interface to try to clear any stale scan cache.
     sudo ip link set "$dut_iface" down
     sudo ip link set "$dut_iface" up
-    sleep 1
+    # Extended from 1s -> 5s as an experiment against a reproducible BE200
+    # firmware crash (ADVANCED_SYSASSERT / NMI_INTERRUPT_LMAC_FATAL) seen when
+    # scanning too soon after link-up. If this doesn't help, this delay isn't
+    # the actual fix and can be reverted.
+    sleep 5
 
     # Build this run's hostapd conf. Strip every existing country_code= line,
     # wherever it appears, rather than just replacing line 1 — prevents the
@@ -181,41 +192,4 @@ while read -r LINE; do
         echo "--- iw reg get (this is your actual LAR result) ---"
         iw reg get
 
-        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines (driver's own LAR record) ---"
-        dmesg | grep -i "get_regdomain\|alpha2" | tail -20
-
-        echo "--- iw list ---"
-        iw list
-
-        echo "--- iw $dut_phy info ---"
-        iw "$dut_phy" info
-
-        echo "--- iw $dut_phy channels ---"
-        iw "$dut_phy" channels
-
-        endTime=$(date +%s)
-        echo "Execution time was $((endTime - startTime)) seconds."
-    } | tee "./$intel_model/wlanpi-$intel_model-$LINE.txt"
-
-    sleep 1
-    echo "Killing hostapd"
-    sudo pkill -f "hostapd ./hostapd-script.conf" || true
-    rm -f "$hostapd_log"
-    sleep 1
-
-    pass_count=$((pass_count + 1))
-    endTime=$(date +%s)
-    echo "Execution time for $LINE was $((endTime - startTime)) seconds."
-done < "$INFILE"
-
-endTotalTime=$(date +%s)
-echo "=========================================="
-echo " Sweep complete: $pass_count passed, $fail_count failed, $skip_count skipped (already had results)"
-if [ "$fail_count" -gt 0 ]; then
-    echo " Failed countries:"
-    for f in "${failed_countries[@]}"; do
-        echo "   - $f"
-    done
-fi
-echo " Total execution time was $((endTotalTime - startTotalTime)) seconds."
-echo "=========================================="
+        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines
