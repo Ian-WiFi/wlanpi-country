@@ -53,10 +53,25 @@ pass_count=0
 fail_count=0
 failed_countries=()
 
+skip_count=0
+
 while read -r LINE; do
     # Skip blank lines and comments in country-codes.txt
     [ -z "$LINE" ] && continue
     case "$LINE" in \#*) continue ;; esac
+
+    # Resume support: if a result file already exists for this country (from
+    # a prior run that got interrupted — crash, reboot, power loss, etc.),
+    # skip it instead of re-running. This lets you just re-launch the same
+    # command after an interruption instead of starting the whole sweep over.
+    # Delete the specific .txt file(s) in ./$intel_model/ if you want to force
+    # a re-test of a country you already have a result for.
+    result_file="./$intel_model/wlanpi-$intel_model-$LINE.txt"
+    if [ -f "$result_file" ]; then
+        echo "Result already exists for $LINE, skipping (delete $result_file to force a re-run)."
+        skip_count=$((skip_count + 1))
+        continue
+    fi
 
     startTime=$(date +%s)
     echo "=========================================="
@@ -195,7 +210,7 @@ done < "$INFILE"
 
 endTotalTime=$(date +%s)
 echo "=========================================="
-echo " Sweep complete: $pass_count passed, $fail_count failed"
+echo " Sweep complete: $pass_count passed, $fail_count failed, $skip_count skipped (already had results)"
 if [ "$fail_count" -gt 0 ]; then
     echo " Failed countries:"
     for f in "${failed_countries[@]}"; do
