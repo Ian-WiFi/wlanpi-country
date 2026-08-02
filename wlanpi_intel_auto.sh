@@ -149,7 +149,16 @@ while read -r LINE; do
         dmesg | grep ucode
 
         echo "--- iw $dut_iface scan (this is what should trigger LAR) ---"
-        sudo iw "$dut_iface" scan
+        scan_output=""
+        for attempt in 1 2 3; do
+            scan_output=$(sudo iw "$dut_iface" scan 2>&1)
+            if ! echo "$scan_output" | grep -q "scan aborted"; then
+                break
+            fi
+            echo "Scan attempt $attempt aborted, retrying..."
+            sleep 2
+        done
+        echo "$scan_output"
 
         # give firmware a moment to process scan results and update its self-managed reg domain
         sleep 2
