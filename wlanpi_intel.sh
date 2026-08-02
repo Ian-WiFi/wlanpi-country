@@ -123,7 +123,20 @@ echo "hostapd confirmed up (AP-ENABLED seen in log)."
     dmesg | grep ucode
 
     echo "--- iw $dut_iface scan (this is what should trigger LAR) ---"
-    sudo iw "$dut_iface" scan
+    # "scan aborted!" is a known transient nl80211 race, not a hardware/LAR
+    # problem — it happens when the interface hasn't fully settled after
+    # being brought up, or something else briefly holds the radio. Retry
+    # rather than treating a single aborted attempt as a real failure.
+    scan_output=""
+    for attempt in 1 2 3; do
+        scan_output=$(sudo iw "$dut_iface" scan 2>&1)
+        if ! echo "$scan_output" | grep -q "scan aborted"; then
+            break
+        fi
+        echo "Scan attempt $attempt aborted, retrying..."
+        sleep 2
+    done
+    echo "$scan_output"
 
     # give firmware a moment to process scan results and update its self-managed reg domain
     sleep 2
