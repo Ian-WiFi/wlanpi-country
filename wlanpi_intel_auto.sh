@@ -192,4 +192,41 @@ while read -r LINE; do
         echo "--- iw reg get (this is your actual LAR result) ---"
         iw reg get
 
-        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines ---"
+        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines (driver's own LAR record) ---"
+        dmesg | grep -i "get_regdomain\|alpha2" | tail -20
+
+        echo "--- iw list ---"
+        iw list
+
+        echo "--- iw $dut_phy info ---"
+        iw "$dut_phy" info
+
+        echo "--- iw $dut_phy channels ---"
+        iw "$dut_phy" channels
+
+        endTime=$(date +%s)
+        echo "Execution time was $((endTime - startTime)) seconds."
+    } | tee "./$intel_model/wlanpi-$intel_model-$LINE.txt"
+
+    sleep 1
+    echo "Killing hostapd"
+    sudo pkill -f "hostapd ./hostapd-script.conf" || true
+    rm -f "$hostapd_log"
+    sleep 1
+
+    pass_count=$((pass_count + 1))
+    endTime=$(date +%s)
+    echo "Execution time for $LINE was $((endTime - startTime)) seconds."
+done < "$INFILE"
+
+endTotalTime=$(date +%s)
+echo "=========================================="
+echo " Sweep complete: $pass_count passed, $fail_count failed, $skip_count skipped (already had results)"
+if [ "$fail_count" -gt 0 ]; then
+    echo " Failed countries:"
+    for f in "${failed_countries[@]}"; do
+        echo "   - $f"
+    done
+fi
+echo " Total execution time was $((endTotalTime - startTotalTime)) seconds."
+echo "=========================================="
