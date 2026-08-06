@@ -192,4 +192,4 @@ while read -r LINE; do
         echo "--- iw reg get (this is your actual LAR result) ---"
         iw reg get
 
-        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines
+        echo "--- dmesg: iwl_mld_get_regdomain alpha2 log lines ---"
