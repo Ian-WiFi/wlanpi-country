@@ -33,6 +33,13 @@ Intel cards with LAR do not follow `iw reg set`. They learn the country from 802
 
 The AP radio must be able to announce each country. If the Linux regulatory database on your machine has no usable rules for a code, hostapd refuses to start and that country is recorded as `HOSTAPD_FAIL`.
 
+## Before you run it
+
+- Use a **dedicated test device** you can afford to lose access to, and connect to it over **Ethernet**. Every country reloads the Wi-Fi driver.
+- The test AP operates under **each tested country's rules, not necessarily yours**. Keep it isolated and at low power, and do not run it where transmitting is not permitted.
+- You are responsible for following the radio regulations where you are. See [DISCLAIMER.md](DISCLAIMER.md).
+- On first run the scripts show a safety notice and ask you to type `yes`. A `.lar_accepted` file next to the scripts remembers it (delete it to be asked again). For unattended runs set `LAR_ACCEPT=1`.
+
 ## Quick start
 
 ```bash
@@ -80,6 +87,7 @@ Interrupted? Run the same command again; countries already finished OK are skipp
 | `MAX_ATTEMPTS` | 2 | one retry for crash, timeout or no beacon |
 | `MAX_CONSEC_FAIL` | 10 | the sweep stops after this many failures in a row (0 = never) |
 | `OUT_ROOT` | script folder | where result folders are created |
+| `LAR_ACCEPT` | unset | `1` confirms the safety notice for unattended runs |
 
 ## Output
 
@@ -132,7 +140,7 @@ Of 249 countries in both: 55 have only world-domain data on the AX210 but countr
 
 ## Contributing
 
-Issues and pull requests are welcome, especially results from other Intel cards, firmware versions and kernels. Please say which hardware, firmware and kernel you used.
+This is a volunteer project, so replies may be slow. Issues and pull requests are welcome, especially results from other Intel cards, firmware versions and kernels. Please say which hardware, firmware and kernel you used.
 
 ## License
 

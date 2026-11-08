@@ -6,7 +6,7 @@ Please read this before using the scripts, tools or data in this repository ("th
 
 ## 1. What this is
 
-The Project is a research and lab tool, shared for information and education. It is not a commercial product and it is not supported.
+The Project is an independent, volunteer-run research and lab tool, shared for information and education. It is not a commercial product and it is not supported.
 
 ## 2. No warranty
 
@@ -33,6 +33,8 @@ You are solely responsible for complying with all radio-frequency, spectrum, saf
 - use it only in an isolated or shielded setup (for example a shielded enclosure, a conducted connection or attenuators) and keep transmit power as low as practical,
 - do not run it where it could interfere with networks or devices you do not own or operate,
 - do not run it where transmitting is prohibited.
+
+The scripts show a safety notice on first run and ask you to confirm it (or you set `LAR_ACCEPT=1` for unattended runs). Confirming the notice, or setting `LAR_ACCEPT=1`, is your acknowledgement that you have read this document.
 
 ## 5. The results are not regulatory advice
 

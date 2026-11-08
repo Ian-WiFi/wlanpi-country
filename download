@@ -9,3 +9,4 @@ lar_analysis/
 *.tgz
 *.partial
 *.bak
+.lar_accepted

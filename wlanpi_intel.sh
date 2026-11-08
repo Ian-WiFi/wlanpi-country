@@ -8,6 +8,7 @@
 #   sudo ./wlanpi_intel.sh --print-rundir    print the output folder for this kernel/ucode and exit
 # Options:
 #   --model NAME   override the auto-detected card model (BE200, AX210, ...)
+#   First run shows a safety notice and asks you to type "yes"; set LAR_ACCEPT=1 for unattended use.
 #   (old style "sudo ./wlanpi_intel.sh BZ BE200" still works)
 #
 # Per country it: reloads the Intel driver (clears cached LAR/MCC state),
@@ -38,7 +39,7 @@ MAX_ATTEMPTS="${MAX_ATTEMPTS:-2}"                            # 1 try + 1 retry f
 CRASH_RE='ADVANCED_SYSASSERT|NMI_INTERRUPT|Microcode SW error|Start IWL Error Log|Hardware error detected|Firmware error|SYSASSERT|Failed to start RT ucode|Failed to run INIT ucode|Unable to initialize device'
 
 log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
-usage() { sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; }
+usage() { sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; }
 fatal() {
     echo "ERROR: $*" >&2
     if [ -n "${run_dir:-}" ] && [ -d "${run_dir:-}/status" ] && [ -n "${country:-}" ]; then
@@ -73,6 +74,35 @@ fi
 
 # ---------------------------------------------------------------- preflight
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: run as root (sudo ./wlanpi_intel.sh ...)" >&2; exit 3; }
+
+require_acceptance() {   # one-time safety notice; asks the user to confirm before anything is changed
+    local marker="${LAR_ACCEPT_FILE:-$SCRIPT_DIR/.lar_accepted}" reply=""
+    [ "${LAR_ACCEPT:-}" = "1" ] && return 0
+    [ -e "$marker" ] && return 0
+    cat >&2 <<'NOTICE'
+
+================================== IMPORTANT ==================================
+This tool runs as root, unloads and reloads the Wi-Fi driver, and makes a Wi-Fi
+radio TRANSMIT while announcing other countries' regulatory settings. It can
+hang the system or the Wi-Fi card, and Wi-Fi on the card under test is lost
+during the run.
+
+You are responsible for following the radio regulations where you are: use a
+shielded or isolated setup and keep transmit power low. Use a dedicated test
+device and a wired connection. Provided "as is", without warranty; see
+DISCLAIMER.md and LICENSE.
+===============================================================================
+NOTICE
+    if [ ! -t 0 ]; then
+        echo "Not running interactively. Set LAR_ACCEPT=1 to confirm you accept this and run unattended." >&2
+        exit 3
+    fi
+    read -r -p 'Type "yes" to continue: ' reply
+    if [ "$reply" != "yes" ]; then echo "Not confirmed - exiting." >&2; exit 3; fi
+    date -Is > "$marker" 2>/dev/null && [ -n "${SUDO_USER:-}" ] && chown "$SUDO_USER:" "$marker" 2>/dev/null
+    return 0
+}
+require_acceptance
 missing=()
 for c in iw hostapd modprobe lsmod lspci timeout dmesg awk grep sed ip flock mktemp; do
     command -v "$c" >/dev/null 2>&1 || missing+=("$c")

@@ -33,6 +33,36 @@ while [ $# -gt 0 ]; do
 done
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: run as root (sudo ./wlanpi_intel_auto.sh)" >&2; exit 3; }
+
+require_acceptance() {   # one-time safety notice; asks the user to confirm before anything is changed
+    local marker="${LAR_ACCEPT_FILE:-$SCRIPT_DIR/.lar_accepted}" reply=""
+    [ "${LAR_ACCEPT:-}" = "1" ] && return 0
+    [ -e "$marker" ] && return 0
+    cat >&2 <<'NOTICE'
+
+================================== IMPORTANT ==================================
+This tool runs as root, unloads and reloads the Wi-Fi driver, and makes a Wi-Fi
+radio TRANSMIT while announcing other countries' regulatory settings. It can
+hang the system or the Wi-Fi card, and Wi-Fi on the card under test is lost
+during the run.
+
+You are responsible for following the radio regulations where you are: use a
+shielded or isolated setup and keep transmit power low. Use a dedicated test
+device and a wired connection. Provided "as is", without warranty; see
+DISCLAIMER.md and LICENSE.
+===============================================================================
+NOTICE
+    if [ ! -t 0 ]; then
+        echo "Not running interactively. Set LAR_ACCEPT=1 to confirm you accept this and run unattended." >&2
+        exit 3
+    fi
+    read -r -p 'Type "yes" to continue: ' reply
+    if [ "$reply" != "yes" ]; then echo "Not confirmed - exiting." >&2; exit 3; fi
+    date -Is > "$marker" 2>/dev/null && [ -n "${SUDO_USER:-}" ] && chown "$SUDO_USER:" "$marker" 2>/dev/null
+    return 0
+}
+require_acceptance
+export LAR_ACCEPT=1
 [ -r "$SINGLE" ] || { echo "ERROR: $SINGLE not found" >&2; exit 3; }
 
 # ---- build the country list (strip CR, comments, blanks; uppercase; de-duplicate) ----
