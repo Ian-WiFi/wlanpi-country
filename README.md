@@ -40,6 +40,20 @@ The AP radio must be able to announce each country. If the Linux regulatory data
 - You are responsible for following the radio regulations where you are. See [DISCLAIMER.md](DISCLAIMER.md).
 - On first run the scripts show a safety notice and ask you to type `yes`. A `.lar_accepted` file next to the scripts remembers it (delete it to be asked again). For unattended runs set `LAR_ACCEPT=1`.
 
+## What is in this repository
+
+| File | Purpose |
+|---|---|
+| `wlanpi_intel.sh` | capture one country (or the `00` baseline) |
+| `wlanpi_intel_auto.sh` | full sweep over `country-codes.txt`, resumable |
+| `lar_compare.py` | analysis: groups, per-country diffs, run-to-run and card-to-card comparison |
+| `make_share_package.py` | copy result folders with MAC addresses, hostname and similar details masked, ready to share |
+| `country-codes.txt` | the 249 country codes swept (`AN` is a retired code and is kept; `TG` is left out, see limitations) |
+| `hostapd-script.conf` | template for the test AP; country, interface, channel and mode are written by the script |
+| `results/` | example analysis output from the BE200 and AX210 runs |
+| `README_DATA.md` | the README used inside the shareable data package |
+| `DISCLAIMER.md`, `LICENSE` | use at your own risk; MIT license |
+
 ## Quick start
 
 ```bash
@@ -120,7 +134,7 @@ A card reporting the requested country label does not by itself mean it has coun
 
 ## Example results
 
-Run on a WLAN Pi M4, kernel 7.3.0-rc5-v8-wlanpi+. These describe one card, firmware and kernel under specific conditions; they are observations, not regulatory information. See `results/` if present.
+Run on a WLAN Pi M4, kernel 7.3.0-rc5-v8-wlanpi+. These describe one card, firmware and kernel under specific conditions; they are observations, not regulatory information. The analysis files are in the `results/` folder.
 
 | | BE200 (ucode 106.c88d33af.0) | AX210 (ucode 89.f7dcb3ee.0) |
 |---|---|---|
@@ -136,7 +150,7 @@ Of 249 countries in both: 55 have only world-domain data on the AX210 but countr
 - The beacon channel varies by country (5 GHz channel 36 where allowed, else 149, else 2.4 GHz channel 6); each status file records it. A DE control run gave identical card data over 2.4 GHz and 5 GHz (one country only).
 - The "LAR lines" section of each capture is empty on the tested kernel; no LAR messages appear in the kernel log at its default level.
 - During development a system hang occurred during a driver reload and the card was not seen again until after a power cycle. The cause was not confirmed. Results are flushed to disk after each country so a hang loses little.
-- Captures include MAC addresses and the hostname. If you share your own raw captures, remove them first.
+- Captures include MAC addresses and the hostname. Before sharing your own results, mask them with `make_share_package.py` (it copies the result folders, masks identifying details, checks the copy and can zip it; run `python3 make_share_package.py --help`). Your originals are never changed.
 
 ## Contributing
 
